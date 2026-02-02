@@ -1,0 +1,3 @@
+[submodule "coreboot"]
+	path = coreboot
+	url = https://github.com/jackadam1981/coreboot-CXI4.git

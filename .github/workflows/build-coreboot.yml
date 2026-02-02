@@ -1,0 +1,75 @@
+# CoreBoot 自动编译工作流
+# 使用 coreboot-sdk Docker 镜像（预编译工具链，显著加快构建）
+# 默认编译 kaisa 板型 (可手动指定其他板型)
+# 参考: https://docs.mrchromebox.tech/docs/support/compiling.html
+# 镜像: https://hub.docker.com/r/coreboot/coreboot-sdk
+
+name: Build CoreBoot Firmware
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      board_name:
+        description: '目标板型号 (默认: kaisa)'
+        required: false
+        default: 'kaisa'
+      debug_mode:
+        description: '启用调试模式'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  BOARD_NAME: ${{ github.event.inputs.board_name || 'kaisa' }}
+  DEBUG_MODE: ${{ github.event.inputs.debug_mode || 'false' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: coreboot/coreboot-sdk:testing
+      options: --user root
+
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: 更新子模块
+      working-directory: coreboot
+      run: |
+        git submodule update --init --checkout --recursive
+
+    - name: 编译固件
+      working-directory: coreboot
+      run: |
+        if [ "${{ env.DEBUG_MODE }}" = "true" ]; then
+          ./build-uefi.sh ${{ env.BOARD_NAME }} --debug
+        else
+          ./build-uefi.sh ${{ env.BOARD_NAME }}
+        fi
+
+    - name: 上传固件产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-firmware-${{ env.BOARD_NAME }}
+        path: |
+          roms/*.rom
+          roms/*.sha1
+        retention-days: 30
+
+    - name: 创建 Release (仅限 tag 推送)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          roms/*.rom
+          roms/*.sha1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
