@@ -1,0 +1,8 @@
+# Build output
+roms/
+
+# Root copy of RtkUndiDxe (canonical copy is in fixed-files/)
+RtkUndiDxe.efi
+
+# edk2 fork clone (build uses payloads/external; not a submodule here)
+edk2-fork/
