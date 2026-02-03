@@ -2,6 +2,29 @@
 
 本项目用来编译 CoreBoot 固件，默认编译 **kaisa** 板型。
 
+## 克隆与子模块（coreboot）
+
+**coreboot 以 Git 子模块形式存在**，这样仓库只记录其提交引用，便于管理和升级。
+
+- **首次克隆**（推荐，一次拉齐 coreboot 内容）：
+  ```bash
+  git clone --recurse-submodules https://github.com/你的用户名/CoreBoot-Build.git
+  ```
+- **已经克隆过**，但当时未带 `--recurse-submodules`，需要补拉 coreboot：
+  ```bash
+  git submodule update --init --recursive
+  ```
+- **查看子模块状态**（当前 coreboot 指向的提交）：
+  ```bash
+  git submodule status
+  ```
+- **升级 coreboot 到远端最新**（在子模块目录内拉取后，回主仓库提交新引用）：
+  ```bash
+  cd coreboot && git pull origin main && cd .. && git add coreboot && git commit -m "Update coreboot submodule"
+  ```
+
+不执行 `--recurse-submodules` 或 `submodule update --init` 时，`coreboot/` 会为空或不存在，编译前请先初始化子模块。
+
 ## 项目结构
 
 ```
@@ -14,6 +37,8 @@ CoreBoot-Build/
 ├── check-build-log-pxe.sh   # 检查 build.log 是否包含 PXE 相关编译项
 ├── verify-rom-pxe.sh     # 验证 ROM 内 PXE 相关模块
 ├── read-boot-log.sh       # 读取/解析启动日志
+├── scripts/              # 工具脚本
+│   └── check-windows-shutdown.ps1   # Windows 关机/重启诊断（隐藏 EC 后自动关机排查）
 ├── roms/                 # 编译产物，按时间戳子目录 roms/YYYYMMDDHHMMSS/ 存放
 ├── backups/              # 刷写前备份固件存放目录（由 flash-coreboot.sh 创建）
 ├── util/                 # cbfstool、gbb_utility 等工具（可选）
@@ -35,6 +60,8 @@ CoreBoot-Build/
 - **CONFIG_EC_FOR_CHROMEBOX**：隐藏 AC 适配器、电池、Chromebook EC Bus、键盘与 vbtn（_STA=0），减少设备管理器中的无关设备
 - **CONFIG_SOC_INTEL_HIDE_EMMC**：隐藏 eMMC 控制器（ACPI _STA=0 + FSP 不启用），使系统只显示一个 SD 读卡器（TF 卡槽）
 - PXE：启用标准 PXE（RtkUndiDxe），可选 iPXE
+
+若在 **Windows** 下开启上述“隐藏 EC/电池等”后出现**自动关机/重启**，可用仓库内脚本收集关机原因以便排查：在 Windows 上以**管理员**运行 `scripts\check-windows-shutdown.ps1`（或双击 `scripts\run-check-windows-shutdown.bat`），会生成 `scripts\check-windows-shutdown-report.txt`，其中包含 Kernel-Power 41、User32 1074、EventLog 6008 等事件及简要说明。
 
 ## 使用方法
 
