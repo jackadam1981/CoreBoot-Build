@@ -154,3 +154,9 @@ ectool autofanctrl
 ```
 
 若提示找不到设备或权限错误，请确认 Chrome EC 驱动已正确安装且设备管理器中无黄色感叹号。
+
+---
+
+## 修改 EC 风扇策略（温控表 / 转速）
+
+若要改风扇启停温度、转速范围等，需修改 EC 源码并重新把 EC 打进 ROM。详见 [ec-fan-config.md](ec-fan-config.md)：改 `ec/board/puff/board.c` → 编 EC → **执行 `replace-ec-blob.sh`** → 再编 coreboot。

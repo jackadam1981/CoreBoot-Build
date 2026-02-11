@@ -1,6 +1,3 @@
-# Build output
-roms/
-
 # Root copy of RtkUndiDxe (canonical copy is in fixed-files/)
 RtkUndiDxe.efi
 

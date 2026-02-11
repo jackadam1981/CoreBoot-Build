@@ -10,6 +10,9 @@ CoreBoot-Build/
 │   └── build-coreboot.yml
 ├── coreboot/             # MrChromebox coreboot 子模块
 ├── docker-build.sh       # 本地 Docker (coreboot-sdk) 编译脚本
+├── build-ec.sh          # 使用 coreboot-sdk Docker 编译 Chrome EC（Kaisa 用 board puff）
+├── build-ec-native.sh   # 本机 arm-none-eabi 编译 EC（无需 Docker，适合磁盘紧张时）
+├── replace-ec-blob.sh   # 将编好的 ec.RW.flat 复制到 coreboot blobs（改风扇后必做，再编 ROM）
 ├── flash-coreboot.sh     # 刷写固件脚本（需 root，见下方说明）
 ├── check-build-log-pxe.sh   # 检查 build.log 是否包含 PXE 相关编译项
 ├── verify-rom-pxe.sh     # 验证 ROM 内 PXE 相关模块
@@ -73,6 +76,41 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace/coreboot coreboot/coreboot-
 
 
 编译成功后，固件将保存在 `roms/YYYYMMDDHHMMSS/` 目录。
+
+### 使用 CoreBoot SDK 编译 Chrome EC（方式 B）
+
+Kaisa 使用的 EC 在 Chrome EC 仓库中对应 **board puff**。若要用 **CoreBoot SDK** 的工具链（镜像内 `/opt/coreboot-sdk/bin/arm-eabi-`）编译 EC，无需在本机安装 ARM 交叉编译器：
+
+```bash
+# 默认使用与 CoreBoot-Build 同级的 ec 目录
+./build-ec.sh
+
+# 或指定 EC 源码目录
+./build-ec.sh /path/to/ec
+```
+
+脚本会拉取 `coreboot/coreboot-sdk` 镜像（与编译 CoreBoot 相同），在容器内执行 `make -j BOARD=puff`，产物在 `ec/build/puff/ec.bin`。
+
+**若拉取镜像时提示 “no space left on device”**：Docker/containerd 可能使用根分区（如 `/var/lib/containerd`），而 coreboot-sdk 镜像约 2.5GB。可改用本机工具链编译，不占用大镜像：
+
+```bash
+# 安装工具链（任选其一）
+sudo dnf install arm-none-eabi-gcc   # Fedora
+sudo apt-get install gcc-arm-none-eabi   # Debian/Ubuntu
+
+./build-ec-native.sh /storage/ec     # 或 ./build-ec-native.sh 使用默认 ../ec
+```
+
+### 改 EC 风扇配置并替换进 ROM
+
+修改 EC 风扇/温控后，必须**用新 EC 替换 coreboot 里的 blob**，再编 coreboot，ROM 才会带上新 EC：
+
+1. 改 **ec/board/puff/board.c** 中 `fan_rpm_0`、`thermal_a` 等（详见 [docs/ec-fan-config.md](docs/ec-fan-config.md)）。
+2. 编译 EC：`./build-ec.sh /path/to/ec` 或 `./build-ec-native.sh /path/to/ec`。
+3. **替换 blob**：`./replace-ec-blob.sh /path/to/ec`（把 `ec/build/puff/RW/ec.RW.flat` 复制到 `coreboot/3rdparty/blobs/.../puff/ec.RW.flat`）。
+4. 再编 coreboot：`./docker-build.sh kaisa`。
+
+不执行第 3 步只编 coreboot，ROM 里仍是旧 EC，风扇配置不会变。详见 [docs/ec-fan-config.md](docs/ec-fan-config.md)。
 
 ## 刷写固件
 
