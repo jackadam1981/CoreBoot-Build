@@ -20,7 +20,10 @@
     - `temp_host[EC_TEMP_THRESH_HIGH]`：主机高温告警  
     - `temp_host[EC_TEMP_THRESH_HALT]`：主机过热关机  
 
-示例（当前默认在 board.c 中）：
+示例（按需改数值）：
+
+- **原厂默认**（board.c 里常见）：`temp_fan_off = C_TO_K(41)`、`temp_fan_max = C_TO_K(72)` → ectool temps 显示约 `314 K and 345 K`（41°C 停转，72°C 满速）。
+- **若希望 40°C 停转、55°C 满速**，改为：
 
 ```c
 const struct fan_rpm fan_rpm_0 = {
@@ -30,14 +33,30 @@ const struct fan_rpm fan_rpm_0 = {
 };
 
 const static struct ec_thermal_config thermal_a = {
-	.temp_fan_off = C_TO_K(41),   /* 41°C 以下停转 */
-	.temp_fan_max = C_TO_K(72),   /* 72°C 满速 */
+	.temp_fan_off = C_TO_K(40),   /* 40°C 以下停转 */
+	.temp_fan_max = C_TO_K(55),   /* 55°C 满速 */
 	.temp_host = { ..., [EC_TEMP_THRESH_HIGH] = C_TO_K(68), [EC_TEMP_THRESH_HALT] = C_TO_K(78), },
 	...
 };
 ```
 
-按需修改上述数值后，按下面流程重新编 EC 并替换进 coreboot。
+刷入自编 EC 后，`ectool temps` 会显示 `ratio` 对应的区间为 `313 K and 328 K`（即 40°C 与 55°C）。按需修改上述数值后，按下面流程重新编 EC 并替换进 coreboot。
+
+### 使用 CPU 温度传感器（PECI）而非主板传感器
+
+**说明**：`CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL` 仅让 coreboot 在启动时向 EC 发“启用自动风扇”命令，**不决定 EC 用哪个传感器**。风扇温控使用的传感器在 **EC 固件**（board.c / thermal 相关）中指定。
+
+Puff 默认可能使用 **主板温度传感器**（如 TMP468 等 I2C 芯片），存在延迟和误差。若希望 EC 用 **CPU 温度（PECI）** 控制风扇，需在 EC 源码中修改温控表的传感器引用。
+
+**在 `ec/board/puff/` 中查找**：
+
+- `board.c` 里的 `thermal_a`、`thermal_b` 等结构
+- 其中应有字段指定温度来源（如 `temp_sensor_id`、`sensor_type`、或按 `TEMP_SENSOR_TYPE_*` 的索引）
+- Chrome EC 常见类型：`TEMP_SENSOR_TYPE_CPU`（PECI/CPU）、`TEMP_SENSOR_TYPE_BOARD`（主板）
+
+**修改思路**：把 thermal 表中用于风扇控制的传感器改为 `TEMP_SENSOR_TYPE_CPU` 或对应的 PECI 传感器 ID（具体字段名以 platform/ec 实际结构为准）。若当前为 board 传感器，改为 CPU 传感器后，风扇响应会更快、更贴近 CPU 实际温度。
+
+修改后需重新编译 EC、替换 ec.RW.flat，再编 coreboot 并刷入 ROM。
 
 ---
 

@@ -92,6 +92,14 @@
 | **CONFIG_EDK2_FULL_SCREEN_SETUP** | n（板级 default） | 设置界面全屏；n 时为 640×480。 |
 | **CONFIG_D3COLD_SUPPORT** | 板级 | 支持 PCIe D3 Cold 省电。 |
 
+### 2.6 CPU 频率与功率限制（为何只跑到约 3 GHz）
+
+Kaisa 的 CPU（如 Comet Lake-U 4C8T）规格里 **Max Turbo 4.90 GHz** 指的是 **单核/短时睿频**，不是全核长期运行频率。固件里把 **PL1（持续功耗）设为 25W**（overridetree.cb + DPTF），与 Intel “Configurable TDP-up 25W、Base 2.30 GHz” 一致：在 25W 下全核满载时，CPU 会落在约 **2.8～3.2 GHz** 是正常现象，否则会超功耗或过热降频。
+
+- **PL1 = 25W**：持续功率上限（当前在 `variants/kaisa/overridetree.cb` 中 `power_limits_config.tdp_pl1_override = 25`，DPTF `controls.power_limits.pl1` 也为 25000 mW）。
+- **PL2 = 25～51W**：短时睿频上限，PL1 时间窗（约 28～32 s）内平均不超过 PL1。
+- 若散热允许且希望**长期更高频率**，可尝试在 overridetree.cb 与 DPTF 中提高 PL1（如 35W），并观察温度与稳定性；Chromebox 原设计多为 15W，提高 PL1 需自行承担过热/稳定性风险。
+
 ---
 
 ## 3. Embedded Controllers（EC）
@@ -115,7 +123,7 @@
 | **CONFIG_EC_GOOGLE_CHROMEEC_FIRMWARE_EXTERNAL** | y（defconfig） | 使用外置 EC 固件文件。**不可设为 n 来“在 coreboot 里编译 EC”**：coreboot 不包含 Chrome EC 源码与构建，设为 n 只会导致镜像中不包含 ecrw（无 EC 固件打进 ROM）。要自编 EC 需在 ChromiumOS 的 platform/ec 中编译，得到 ec.RW.flat 后放到 blobs 路径并保持本项 y。 |
 | **CONFIG_EC_GOOGLE_CHROMEEC_FIRMWARE_FILE** | defconfig 指定 | EC 固件路径，如 `3rdparty/blobs/.../puff/ec.RW.flat`。 |
 | **CONFIG_EC_GOOGLE_CHROMEEC_READ_BATTERY_LONG_STRING** | n（defconfig） | 是否读长电池字符串；Kaisa 无电池，关掉可避免多余 EC 命令。 |
-| **CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL** | y（defconfig） | 启动时把风扇设为自动模式，保证温控生效。 |
+| **CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL** | y（defconfig） | 启动时向 EC 发送“启用自动风扇”命令；**风扇使用的温度传感器由 EC 固件**（board.c 中 thermal 表）决定，默认可能为主板传感器，非 CPU；若需用 CPU 温度（PECI）控扇，需改 EC 源码，见 [ec-fan-config.md](ec-fan-config.md)。 |
 | **CONFIG_EC_GOOGLE_CHROMEEC_AFTER_G3_STATE** | y（defconfig） | 启动时把固件“断电恢复后是否开机”同步到 EC，与 PMC 一致。 |
 | **CONFIG_EC_GOOGLE_CHROMEEC_RTC** | y（defconfig） | 在 ACPI 中暴露 EC RTC，供 Windows 时间同步/闹钟等使用。 |
 | **CONFIG_EC_GOOGLE_CHROMEEC_I2C_TUNNEL** | 板级 | EC I2C 隧道，若板子有 I2C 设备经 EC 转接则选。 |

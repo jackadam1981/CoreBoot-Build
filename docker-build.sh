@@ -52,6 +52,8 @@ docker run --rm --user root \
         set -e
         git config --global --add safe.directory /workspace
         git config --global --add safe.directory /workspace/coreboot
+        git config --global --add safe.directory /workspace/coreboot/payloads/external/iPXE/ipxe
+        git config --global --add safe.directory '*'
         git config --global http.postBuffer 524288000
         git config --global http.lowSpeedLimit 0
         git config --global http.lowSpeedTime 999999
